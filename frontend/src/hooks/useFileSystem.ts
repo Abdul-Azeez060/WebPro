@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { FileStructure, FileState } from "../types/file";
+import { FileStructure, SelectedFile } from "../types/file";
 
 const initialFiles: FileStructure[] = [
   {
@@ -37,10 +37,7 @@ const initialFiles: FileStructure[] = [
 ];
 
 export function useFileSystem() {
-  const [fileState, setFileState] = useState<FileState>({
-    files: initialFiles,
-    currentFile: null,
-  });
+  const [fileState, setFileState] = useState<FileStructure[]>(initialFiles);
 
   const selectFile = (file: FileStructure) => {
     if (file.type === "file") {
@@ -52,8 +49,6 @@ export function useFileSystem() {
   };
 
   return {
-    files: fileState.files,
-    currentFile: fileState.currentFile,
     selectFile,
   };
 }

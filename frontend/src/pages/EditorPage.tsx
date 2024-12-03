@@ -2,18 +2,22 @@ import React, { useEffect, useState } from "react";
 import { Steps } from "../components/Steps";
 import { Editor } from "../components/Editor";
 import { FileExplorer } from "../components/FileExplorer/FileExplorer";
-import { useFileSystem } from "../hooks/useFileSystem";
+// import { useFileSystem } from "../hooks/useFileSystem";
 import { BACKEND_URL } from "../backend";
 import axios from "axios";
-import { Step } from "../types/step";
+import { Status, Step, StepType } from "../types/step";
 import { stepsParser } from "../steps";
 import { useLocation } from "react-router-dom";
+import { FileStructure } from "../types/file";
 
 export function EditorPage() {
   const location = useLocation();
   const { prompt } = location.state || {};
-  const { files, currentFile, selectFile } = useFileSystem();
-  const [steps, useSteps] = useState<Step[]>([]);
+  // const { files, currentFile, selectFile } = useFileSystem();
+  const [steps, setSteps] = useState<Step[]>([]);
+  const [files, setFiles] = useState<FileStructure[]>([]);
+  const [selectFile, setSelectFile] = useState<FileStructure | null>();
+  const [currentFile, setCurrentFile] = useState<FileStructure | null>();
 
   async function init() {
     const response = await axios.post(`${BACKEND_URL}/template`, {
@@ -24,13 +28,89 @@ export function EditorPage() {
 
     console.log("these are the uiprompts", response.data.uiPrompts);
     const steps = stepsParser(response.data.uiPrompts);
-    useSteps(steps);
+    setSteps(steps);
 
     // axios.post(`${BACKEND_URL}/chat`, {
     //   messages: [...messages, `<bolt_running_commands>\n</bolt_running_commands>\n\n${prompt}\n\n# File Changes\n\nHere is a list of all files that have been modified since the start of the conversation.\nThis information serves as the true contents of these files!\n\nThe contents include either the full file contents or a diff (when changes are smaller and localized).\n\nUse it to:\n - Understand the latest file modifications\n - Ensure your suggestions build upon the most recent version of the files\n - Make informed decisions about changes\n - Ensure suggestions are compatible with existing code\n\nHere is a list of files that exist on the file system but are not being shown to you:\n\n  - /home/project/.bolt/config.json`],
     // }).then(res => console.log(res)).catch(err => console.log(err))
   }
-  useEffect(() => {}, [steps]);
+  useEffect(() => {
+    // Copying the current files state into a new array to avoid mutating the original files directly
+    let originalFiles = [...files];
+    let updateHappened = false; // Flag to track if any updates occurred
+
+    // Filtering steps with status 'pending' and processing each one
+    steps
+      .filter(({ status }) => status == Status.pending)
+      .map((step) => {
+        updateHappened = true; // Since a step is being processed, updates are happening
+        if (step.stepType === StepType.CreateFile) {
+          // Check if the step is of type "CreateFile"
+          let parsedPath = step.path?.split("/") ?? []; // Split the path into parts (e.g., "/src/components/NewFile.tsx" -> ["src", "components", "NewFile.tsx"])
+          let currentFileStructure = [...originalFiles]; // Create a working copy of the file structure
+          let finalAnswerRef = currentFileStructure; // Maintain a reference to the top-level structure
+
+          let currentFolder = ""; // Initialize a string to build folder paths during traversal
+          while (parsedPath.length) {
+            currentFolder = `${currentFolder}/${parsedPath[0]}`; // Build the path incrementally
+            let currentFolderName = parsedPath[0]; // Get the current segment of the path
+            parsedPath = parsedPath.slice(1); // Remove the processed segment from the path array
+
+            if (!parsedPath.length) {
+              // If this is the last segment, it represents the final file
+              let file = currentFileStructure.find(
+                (x) => x.path === currentFolder
+              ); // Check if the file already exists
+              if (!file) {
+                // If the file doesn't exist, create it
+                currentFileStructure.push({
+                  name: currentFolderName,
+                  type: "file",
+                  path: currentFolder,
+                  content: step.code, // Add the content from the step
+                });
+              } else {
+                // If the file exists, update its content
+                file.content = step.code;
+              }
+            } else {
+              // If this is not the last segment, it's a folder
+              let folder = currentFileStructure.find(
+                (x) => x.path === currentFolder
+              ); // Check if the folder exists
+              if (!folder) {
+                // If the folder doesn't exist, create it
+                currentFileStructure.push({
+                  name: currentFolderName,
+                  type: "folder",
+                  path: currentFolder,
+                  children: [], // Folders have an empty children array initially
+                });
+              }
+              // Move the current file structure pointer to the children of the current folder
+              currentFileStructure = currentFileStructure.find(
+                (x) => x.path === currentFolder
+              )!.children!;
+            }
+          }
+
+          originalFiles = finalAnswerRef; // Update the original files structure with the new changes
+        }
+      });
+
+    if (updateHappened) {
+      // If any updates occurred, update the state
+      setFiles(originalFiles); // Update the files state with the modified file structure
+      setSteps((steps) =>
+        steps.map((s) =>
+          // Mark all steps as "completed"
+          ({ ...s, status: Status.completed })
+        )
+      );
+    }
+
+    console.log(files); // Log the updated file structure for debugging
+  }, [steps, files]); // Dependencies: Runs when steps or files change
 
   useEffect(() => {
     init();
@@ -48,12 +128,12 @@ export function EditorPage() {
         <div className="w-[20%] border-l border-gray-700">
           <FileExplorer
             files={files}
-            onFileSelect={selectFile}
-            selectedFile={currentFile}
+            onFileSelect={setSelectFile}
+            selectedFile={selectFile || null}
           />
         </div>
         <div className="flex-1 p-6">
-          <Editor currentFile={currentFile} />
+          <Editor currentFile={selectFile || null} />
         </div>
       </div>
     </div>

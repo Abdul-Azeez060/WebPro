@@ -6,7 +6,6 @@ export interface FileStructure {
   content?: string;
 }
 
-export interface FileState {
-  files: FileStructure[];
+export interface SelectedFile {
   currentFile: FileStructure | null;
 }

@@ -21,7 +21,7 @@ export function Steps({ steps }: { steps: Step[] }) {
           <ul className="list-decimal list-inside space-y-2 text-gray-400">
             {steps.map((step) => (
               <p className="flex ">
-                {step.status == Status.success ? (
+                {step.status == Status.completed ? (
                   <span className="text-green-600 mr-6 size-1">
                     <CheckCircle />
                   </span>
