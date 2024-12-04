@@ -14,7 +14,7 @@ export function FileExplorer({
   selectedFile,
 }: FileExplorerProps) {
   return (
-    <div className="h-full py-6 bg-gray-900/50 backdrop-blur-sm">
+  <div className="h-full py-6 bg-gray-900/50 backdrop-blur-sm">
       <div className="py-2 px-4">
         {files.map((file) => (
           <FileItem

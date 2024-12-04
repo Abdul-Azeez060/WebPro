@@ -3,8 +3,6 @@ import MonacoEditor from "@monaco-editor/react";
 import { FileText, Play } from "lucide-react";
 import { Button } from "./Button";
 import { FileStructure } from "../types/file";
-import axios from "axios";
-import { BACKEND_URL } from "../backend";
 import { useLocation } from "react-router-dom";
 
 interface EditorProps {
@@ -52,19 +50,7 @@ export function Editor({ currentFile }: EditorProps) {
     }
   }, []);
 
-  useEffect(() => {
-    let messages = [];
-    const response = axios
-      .post(`${BACKEND_URL}/template`, {
-        prompt,
-      })
-      .then((res) => (messages = res.data.prompts))
-      .catch((err) => console.log(err));
 
-    axios.post(`${BACKEND_URL}/chat`, {
-      messages: [],
-    });
-  }, []);
 
   return (
     <div className="h-full flex flex-col bg-gray-800/50 backdrop-blur-sm rounded-xl overflow-hidden">

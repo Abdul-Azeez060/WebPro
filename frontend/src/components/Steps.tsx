@@ -16,7 +16,7 @@ export function Steps({ steps }: { steps: Step[] }) {
           <h3 className="font-medium mb-2">Your Prompt</h3>
           <p className="text-gray-400">{prompt || "No prompt provided"}</p>
         </div>
-        <div className="p-4 bg-gray-800 rounded-lg h-[80%] overflow-scroll">
+        <div className="p-4 bg-gray-800 rounded-lg h-[20rem] overflow-scroll">
           <h3 className="font-medium mb-2">Steps</h3>
           <ul className="list-decimal list-inside space-y-2 text-gray-400">
             {steps.map((step) => (
