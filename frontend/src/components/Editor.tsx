@@ -3,19 +3,20 @@ import MonacoEditor from "@monaco-editor/react";
 import { FileText, Play } from "lucide-react";
 import { Button } from "./Button";
 import { FileStructure } from "../types/file";
-import { useLocation } from "react-router-dom";
+import { WebContainer } from "@webcontainer/api";
 
 interface EditorProps {
   currentFile: FileStructure | null;
+  webcontainer: WebContainer;
 }
 
-export function Editor({ currentFile }: EditorProps) {
-  const location = useLocation();
-  const { prompt } = location.state || {};
+export function Editor({ currentFile, webcontainer }: EditorProps) {
   const [view, setView] = useState<"code" | "preview">("code");
-  const [code, setCode] = useState(
+  const [url, setUrl] = useState("");
+  const [code, setCode] = useState<string>(
     currentFile?.content || "// Select a file to edit"
   );
+
   const [isEditorReady, setIsEditorReady] = useState(false);
 
   React.useEffect(() => {
@@ -50,7 +51,20 @@ export function Editor({ currentFile }: EditorProps) {
     }
   }, []);
 
+  async function startDevServer() {
+    const installProcess = await webcontainer?.spawn("npm", ["install"]);
+    console.log("run npm install");
 
+    const installExitCode = await installProcess?.exit;
+
+    if (installExitCode !== 0) {
+      throw new Error("Unable to run npm install");
+    }
+
+    // `npm run dev`
+    await webcontainer?.spawn("npm", ["run", "dev"]);
+    webcontainer?.on("server-ready", (port, url) => setUrl(url));
+  }
 
   return (
     <div className="h-full flex flex-col bg-gray-800/50 backdrop-blur-sm rounded-xl overflow-hidden">
@@ -64,7 +78,10 @@ export function Editor({ currentFile }: EditorProps) {
         </Button>
         <Button
           variant={view === "preview" ? "primary" : "secondary"}
-          onClick={() => setView("preview")}
+          onClick={() => {
+            startDevServer();
+            setView("preview");
+          }}
           className="flex items-center gap-2">
           <Play size={16} />
           Preview
@@ -109,12 +126,11 @@ export function Editor({ currentFile }: EditorProps) {
           </div>
         ) : (
           <div className="absolute inset-0 bg-white">
-            <iframe
-              title="Preview"
-              srcDoc={code}
-              className="w-full h-full border-0"
-              sandbox="allow-scripts allow-same-origin"
-            />
+            {url ? (
+              <iframe src={url} width={"100%"} height={"100%"} />
+            ) : (
+              <p>Loading</p>
+            )}
           </div>
         )}
       </div>

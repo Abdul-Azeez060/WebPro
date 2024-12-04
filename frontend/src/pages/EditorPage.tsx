@@ -9,6 +9,8 @@ import { Status, Step, StepType } from "../types/step";
 import { parseXml, stepsParser } from "../steps";
 import { useLocation } from "react-router-dom";
 import { FileStructure } from "../types/file";
+import { useWebcontainers } from "../hooks/useWebcontainer";
+import { WebContainer } from "@webcontainer/api";
 
 export function EditorPage() {
   const location = useLocation();
@@ -18,27 +20,28 @@ export function EditorPage() {
   const [files, setFiles] = useState<FileStructure[]>([]);
   const [selectFile, setSelectFile] = useState<FileStructure | null>();
   const [currentFile, setCurrentFile] = useState<FileStructure | null>();
+  const [newFileStructure, setNewFileStructure] = useState({});
+  const webcontainerInstance: WebContainer = useWebcontainers()!;
 
   async function init() {
     const response = await axios.post(`${BACKEND_URL}/template`, {
       prompt,
     });
-    console.log("these are the prompts", response.data.prompts);
+    // console.log("these are the prompts", response.data.prompts);
     const messages = response.data.prompts;
 
-    console.log("these are the uiprompts", response.data.uiPrompts);
     const steps = stepsParser(response.data.uiPrompts);
     setSteps(steps);
 
     const result = await axios.post(`${BACKEND_URL}/chat`, {
       messages: [
         ...messages,
-        `${prompt}\n\n# File Changes\n\nHere is a list of all files that have been modified since the start of the conversation.\nThis information serves as the true contents of these files!\n\nThe contents include either the full file contents or a diff (when changes are smaller and localized).\n\nUse it to:\n - Understand the latest file modifications\n - Ensure your suggestions build upon the most recent version of the files\n - Make informed decisions about changes\n - Ensure suggestions are compatible with existing code\n\nHere is a list of files that exist on the file system but are not being shown to you:\n\n  - /home/project/.bolt/config.json`,
+        `  <bolt_running_commands>\n</bolt_running_commands>\n\n${prompt}\n\n# File Changes\n\nHere is a list of all files that have been modified since the start of the conversation.\nThis information serves as the true contents of these files!\n\nThe contents include either the full file contents or a diff (when changes are smaller and localized).\n\nUse it to:\n - Understand the latest file modifications\n - Ensure your suggestions build upon the most recent version of the files\n - Make informed decisions about changes\n - Ensure suggestions are compatible with existing code\n\nHere is a list of files that exist on the file system but are not being shown to you:\n\n  - /home/project/.bolt/config.json`,
       ],
     });
-    console.log(result.data, "this is the data from the result");
+    // console.log(result.data, "this is the data from the result");
     const newSteps = parseXml(result.data);
-    console.log(newSteps, "these are the new steps");
+    // console.log(newSteps, "these are the new steps");
     setSteps((steps) => [...steps, ...newSteps]);
   }
   useEffect(() => {
@@ -116,12 +119,40 @@ export function EditorPage() {
       );
     }
 
-    console.log(files); // Log the updated file structure for debugging
+    // console.log(files); // Log the updated file structure for debugging
   }, [steps, files]); // Dependencies: Runs when steps or files change
 
   useEffect(() => {
     init();
   }, []);
+
+  useEffect(() => {
+    const originalFiles = files;
+    const changedFiles = {};
+    let answerRef = changedFiles;
+    console.log(files, "this is the original file structure");
+    //@ts-ignore
+    getFileStructure(originalFiles, changedFiles);
+    console.log(answerRef, "this is the changed file structure");
+    setNewFileStructure(answerRef);
+    webcontainerInstance
+      ?.mount(newFileStructure)
+      .then(() => console.log("success"));
+  }, [files]);
+
+  function getFileStructure(originalFiles: FileStructure[], changedFiles: any) {
+    if (!originalFiles) {
+      return;
+    }
+    originalFiles.map((x) => {
+      if (x.type == "folder") {
+        changedFiles[x.name] = { directory: {} };
+        getFileStructure(x.children || [], changedFiles[x.name].directory);
+      } else if (x.type == "file") {
+        changedFiles[x.name] = { file: { contents: x.content } };
+      }
+    });
+  }
 
   if (steps.length == 0) {
     return <div>Loading</div>;
@@ -140,7 +171,10 @@ export function EditorPage() {
           />
         </div>
         <div className="flex-1 p-6">
-          <Editor currentFile={selectFile || null} />
+          <Editor
+            webcontainer={webcontainerInstance}
+            currentFile={selectFile || null}
+          />
         </div>
       </div>
     </div>

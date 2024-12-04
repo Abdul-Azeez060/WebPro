@@ -4,7 +4,6 @@ import { CheckCircle } from "lucide-react";
 import { Loader2 } from "lucide-react";
 
 export function Steps({ steps }: { steps: Step[] }) {
-  console.log(steps, "this is inside ");
   const location = useLocation();
   const { prompt } = location.state || {};
 

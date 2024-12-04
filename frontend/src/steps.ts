@@ -50,11 +50,9 @@ export function parseXml(response: string): Step[] {
   const xmlMatch = response.match(
     /<boltArtifact[^>]*>([\s\S]*?)<\/boltArtifact>/
   );
-
   if (!xmlMatch) {
     return [];
   }
-
   const xmlContent = xmlMatch[1];
   const steps: Step[] = [];
   let stepId = 1;
@@ -75,12 +73,20 @@ export function parseXml(response: string): Step[] {
   // Regular expression to find boltAction elements
   const actionRegex =
     /<boltAction\s+type="([^"]*)"(?:\s+filePath="([^"]*)")?>([\s\S]*?)<\/boltAction>/g;
-
   let match;
   while ((match = actionRegex.exec(xmlContent)) !== null) {
     const [, type, filePath, content] = match;
-
     if (type === "file") {
+      // More aggressive code block marker removal
+
+      console.log(content, "this is the content");
+
+      const cleanedCode = content
+        .replace(/^```typescript/, "")
+        .replace(/^```tsx/, "")
+        .replace(/\n```$/, "");
+      console.log(cleanedCode, "this isthe cleaned code");
+
       // File creation step
       steps.push({
         id: stepId++,
@@ -88,10 +94,16 @@ export function parseXml(response: string): Step[] {
         description: "",
         stepType: StepType.CreateFile,
         status: Status.pending,
-        code: content.trim(),
+        code: cleanedCode,
         path: filePath,
       });
     } else if (type === "shell") {
+      // Clean up shell command
+      const cleanedContent = content
+        .replace(/^```\w*\s*/, "") // Remove opening code block marker and any following whitespace
+        .replace(/\s*```$/, "") // Remove closing code block marker with preceding whitespace
+        .trim();
+
       // Shell command step
       steps.push({
         id: stepId++,
@@ -99,11 +111,10 @@ export function parseXml(response: string): Step[] {
         description: "",
         stepType: StepType.RunScript,
         status: Status.pending,
-        code: content.trim(),
+        code: cleanedContent,
       });
     }
   }
-
   return steps;
 }
 
