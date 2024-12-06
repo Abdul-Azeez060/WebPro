@@ -6,22 +6,31 @@ import { FileExplorer } from "../components/FileExplorer/FileExplorer";
 import { BACKEND_URL } from "../backend";
 import axios from "axios";
 import { Status, Step, StepType } from "../types/step";
-import { parseXml, stepsParser } from "../steps";
+import { parser, stepsParser } from "../steps";
 import { useLocation } from "react-router-dom";
 import { FileStructure } from "../types/file";
-import { useWebcontainers } from "../hooks/useWebcontainer";
+
 import { WebContainer } from "@webcontainer/api";
+import { PreviewFrame } from "../components/FileExplorer/PreviewFile";
 
 export function EditorPage() {
   const location = useLocation();
   const { prompt } = location.state || {};
+  const [webcontainerInstance, setwebcontainerinstance] =
+    useState<WebContainer>();
+  async function initWeb() {
+    const webcontainerInstance = await WebContainer.boot();
+    setwebcontainerinstance(webcontainerInstance);
+  }
+  useEffect(() => {
+    initWeb();
+  }, []);
   // const { files, currentFile, selectFile } = useFileSystem();
   const [steps, setSteps] = useState<Step[]>([]);
   const [files, setFiles] = useState<FileStructure[]>([]);
   const [selectFile, setSelectFile] = useState<FileStructure | null>();
   const [currentFile, setCurrentFile] = useState<FileStructure | null>();
   const [newFileStructure, setNewFileStructure] = useState({});
-  const webcontainerInstance: WebContainer = useWebcontainers()!;
 
   async function init() {
     const response = await axios.post(`${BACKEND_URL}/template`, {
@@ -39,10 +48,12 @@ export function EditorPage() {
         `  <bolt_running_commands>\n</bolt_running_commands>\n\n${prompt}\n\n# File Changes\n\nHere is a list of all files that have been modified since the start of the conversation.\nThis information serves as the true contents of these files!\n\nThe contents include either the full file contents or a diff (when changes are smaller and localized).\n\nUse it to:\n - Understand the latest file modifications\n - Ensure your suggestions build upon the most recent version of the files\n - Make informed decisions about changes\n - Ensure suggestions are compatible with existing code\n\nHere is a list of files that exist on the file system but are not being shown to you:\n\n  - /home/project/.bolt/config.json`,
       ],
     });
-    // console.log(result.data, "this is the data from the result");
-    const newSteps = parseXml(result.data);
+    console.log(result.data, "this is the data from the result");
+    const newSteps = parser(result.data);
+    console.log(newSteps, "these are the new steps");
     // console.log(newSteps, "these are the new steps");
     setSteps((steps) => [...steps, ...newSteps]);
+    console.log(steps, "these are updated steps");
   }
   useEffect(() => {
     // Copying the current files state into a new array to avoid mutating the original files directly
@@ -125,30 +136,26 @@ export function EditorPage() {
   useEffect(() => {
     init();
   }, []);
-
   useEffect(() => {
-    const originalFiles = files;
-    const changedFiles = {};
-    let answerRef = changedFiles;
-    console.log(files, "this is the original file structure");
-    //@ts-ignore
-    getFileStructure(originalFiles, changedFiles);
-    console.log(answerRef, "this is the changed file structure");
-    setNewFileStructure(answerRef);
-    webcontainerInstance
-      ?.mount(newFileStructure)
-      .then(() => console.log("success"));
-  }, [files]);
+    if (webcontainerInstance && files.length > 0) {
+      const fileStructure = {};
+      getFileStructure(files, fileStructure);
 
-  function getFileStructure(originalFiles: FileStructure[], changedFiles: any) {
-    if (!originalFiles) {
-      return;
+      webcontainerInstance
+        .mount(fileStructure)
+        .then(() => console.log("Mounted file structure successfully"))
+        .catch((error) => console.error("Mounting failed:", error));
     }
-    originalFiles.map((x) => {
-      if (x.type == "folder") {
+  }, [files, webcontainerInstance]);
+  function getFileStructure(
+    originalFiles: FileStructure[],
+    changedFiles: Record<string, any>
+  ) {
+    originalFiles.forEach((x) => {
+      if (x.type === "folder") {
         changedFiles[x.name] = { directory: {} };
         getFileStructure(x.children || [], changedFiles[x.name].directory);
-      } else if (x.type == "file") {
+      } else if (x.type === "file") {
         changedFiles[x.name] = { file: { contents: x.content } };
       }
     });
@@ -172,8 +179,8 @@ export function EditorPage() {
         </div>
         <div className="flex-1 p-6">
           <Editor
-            webcontainer={webcontainerInstance}
-            currentFile={selectFile || null}
+            currentFile={selectFile!}
+            webcontainer={webcontainerInstance!}
           />
         </div>
       </div>

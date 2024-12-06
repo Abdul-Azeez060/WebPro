@@ -50,21 +50,30 @@ export function Editor({ currentFile, webcontainer }: EditorProps) {
         return "typescript";
     }
   }, []);
-
-  async function startDevServer() {
+  const startDevServer = useCallback(async () => {
+    console.log("webcontainer is present, spawning the process npm i ");
     const installProcess = await webcontainer?.spawn("npm", ["install"]);
-    console.log("run npm install");
+    console.log("installed all the dependencies");
+    installProcess.output.pipeTo(
+      new WritableStream({
+        write(data) {
+          console.log(data);
+        },
+      })
+    );
+    await installProcess.exit;
+    console.log("running npm run dev");
+    await webcontainer.spawn("npm", ["run", "dev"]);
+    console.log("ran npm run dev, starting the server");
 
-    const installExitCode = await installProcess?.exit;
-
-    if (installExitCode !== 0) {
-      throw new Error("Unable to run npm install");
-    }
-
-    // `npm run dev`
-    await webcontainer?.spawn("npm", ["run", "dev"]);
-    webcontainer?.on("server-ready", (port, url) => setUrl(url));
-  }
+    // Wait for `server-ready` event
+    webcontainer.on("server-ready", (port, url) => {
+      // ...
+      console.log(url);
+      console.log(port);
+      setUrl(url);
+    });
+  }, [webcontainer]);
 
   return (
     <div className="h-full flex flex-col bg-gray-800/50 backdrop-blur-sm rounded-xl overflow-hidden">
@@ -79,7 +88,13 @@ export function Editor({ currentFile, webcontainer }: EditorProps) {
         <Button
           variant={view === "preview" ? "primary" : "secondary"}
           onClick={() => {
-            startDevServer();
+            console.log("clicked the preview buttono");
+            startDevServer()
+              .then(() => console.log("server startede successfull"))
+              .catch(() =>
+                console.log("there was an error in starting the server")
+              );
+            console.log("successful set the state to preview");
             setView("preview");
           }}
           className="flex items-center gap-2">
@@ -125,11 +140,21 @@ export function Editor({ currentFile, webcontainer }: EditorProps) {
             />
           </div>
         ) : (
-          <div className="absolute inset-0 bg-white">
+          <div
+            style={{
+              width: "100%",
+              height: "500px",
+              border: "1px solid #ccc",
+            }}>
             {url ? (
-              <iframe src={url} width={"100%"} height={"100%"} />
+              <iframe
+                src={url}
+                width="100%"
+                height="100%"
+                title="Webcontainer API Content"
+              />
             ) : (
-              <p>Loading</p>
+              <p>Loading...</p>
             )}
           </div>
         )}

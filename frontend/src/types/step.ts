@@ -9,6 +9,7 @@ export enum StepType {
   CreateFolder,
   EditFile,
   DeleteFile,
+  RunScript,
 }
 
 export interface Step {
