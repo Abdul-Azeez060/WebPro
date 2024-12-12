@@ -13,9 +13,9 @@ export function Steps({ steps }: { steps: Step[] }) {
       <div className="p-6 text-gray-200">
         <h2 className="text-xl font-semibold mb-4">Generation Steps</h2>
         <div className="space-y-4">
-          <div className="p-4 bg-gray-800 rounded-lg">
+          <div className="p-4 bg-gray-800 rounded-lg max-h-24 overflow-scroll">
             <h3 className="font-medium mb-2">Your Prompt</h3>
-            <p className="text-gray-400">{prompt || "No prompt provided"}</p>
+            <p className="text-gray-400 ">{prompt || "No prompt provided"}</p>
           </div>
           <div className="p-4 bg-gray-800 rounded-lg h-[20rem] overflow-scroll">
             <h3 className="font-medium mb-2">Steps</h3>

@@ -103,7 +103,6 @@ app.post("/chat", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
                 _d = false;
                 const chunk = _c;
                 const chunkText = chunk.text();
-                console.log(chunkText, "this is the chunk");
                 res.write(chunkText); //Send each chunk to the client
             }
         }

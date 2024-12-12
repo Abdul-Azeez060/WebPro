@@ -69,7 +69,6 @@ app.post("/chat", async (req: any, res: any) => {
     const result = await model.generateContentStream(prompt);
     for await (const chunk of result.stream) {
       const chunkText = chunk.text();
-      console.log(chunkText, "this is the chunk");
       res.write(chunkText); //Send each chunk to the client
     }
 
