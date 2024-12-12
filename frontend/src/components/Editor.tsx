@@ -1,18 +1,29 @@
 import React, { useState, useCallback, useEffect } from "react";
 import MonacoEditor from "@monaco-editor/react";
-import { FileText, Play } from "lucide-react";
+import { FileText, Loader2, Play } from "lucide-react";
 import { Button } from "./Button";
 import { FileStructure } from "../types/file";
 import { WebContainer } from "@webcontainer/api";
+import { downloadProjectAsZip } from "@/utils/getZip";
 
 interface EditorProps {
   currentFile: FileStructure | null;
   webcontainer: WebContainer;
+  files: FileStructure[];
+  previewLoader: boolean;
+  loading: boolean;
 }
 
-export function Editor({ currentFile, webcontainer }: EditorProps) {
+export function Editor({
+  currentFile,
+  webcontainer,
+  files,
+  previewLoader,
+  loading,
+}: EditorProps) {
   const [view, setView] = useState<"code" | "preview">("code");
   const [url, setUrl] = useState("");
+  const [outputMessage, setOutputMessage] = useState("");
   const [code, setCode] = useState<string>(
     currentFile?.content || "// Select a file to edit"
   );
@@ -51,28 +62,30 @@ export function Editor({ currentFile, webcontainer }: EditorProps) {
     }
   }, []);
   const startDevServer = useCallback(async () => {
-    console.log("webcontainer is present, spawning the process npm i ");
-    const installProcess = await webcontainer?.spawn("npm", ["install"]);
-    console.log("installed all the dependencies");
-    installProcess.output.pipeTo(
-      new WritableStream({
-        write(data) {
-          console.log(data);
-        },
-      })
-    );
-    await installProcess.exit;
-    console.log("running npm run dev");
-    await webcontainer.spawn("npm", ["run", "dev"]);
-    console.log("ran npm run dev, starting the server");
+    try {
+      setOutputMessage("installing all the dependencies");
+      const installProcess = await webcontainer?.spawn("npm", ["install"]);
+      installProcess.output.pipeTo(
+        new WritableStream({
+          write(data) {
+            console.log(data);
+            setOutputMessage(data);
+          },
+        })
+      );
+      setOutputMessage("Installed all the dependicies");
+      await installProcess.exit;
+      setOutputMessage("running the dev script");
+      await webcontainer.spawn("npm", ["run", "dev"]);
 
-    // Wait for `server-ready` event
-    webcontainer.on("server-ready", (port, url) => {
-      // ...
-      console.log(url);
-      console.log(port);
-      setUrl(url);
-    });
+      // Wait for `server-ready` event
+      webcontainer.on("server-ready", (port, url) => {
+        // ...
+        setUrl(url);
+      });
+    } catch (error) {
+      console.log(error, "in starting the webcontainer");
+    }
   }, [webcontainer]);
 
   return (
@@ -86,6 +99,7 @@ export function Editor({ currentFile, webcontainer }: EditorProps) {
           Code
         </Button>
         <Button
+          disabled={previewLoader || loading}
           variant={view === "preview" ? "primary" : "secondary"}
           onClick={() => {
             console.log("clicked the preview buttono");
@@ -98,8 +112,28 @@ export function Editor({ currentFile, webcontainer }: EditorProps) {
             setView("preview");
           }}
           className="flex items-center gap-2">
-          <Play size={16} />
-          Preview
+          {previewLoader || loading ? (
+            <span className="animate-spin">
+              <Loader2 />
+            </span>
+          ) : (
+            <span>
+              <Play size={16} /> Preview
+            </span>
+          )}
+        </Button>
+        <Button
+          variant="primary"
+          onClick={() => downloadProjectAsZip(files)}
+          disabled={previewLoader || loading}
+          className="flex items-center gap-2">
+          {previewLoader || loading ? (
+            <span className=" animate-spin">
+              <Loader2 />
+            </span>
+          ) : (
+            <span>Download zip</span>
+          )}
         </Button>
       </div>
 
@@ -108,10 +142,7 @@ export function Editor({ currentFile, webcontainer }: EditorProps) {
           <div className="absolute inset-0">
             <MonacoEditor
               height="100%"
-              defaultLanguage="typescript"
-              language={
-                currentFile ? getLanguage(currentFile.path) : "typescript"
-              }
+              language={currentFile ? getLanguage(currentFile.path) : "txt"}
               theme="vs-dark"
               value={code}
               onChange={(value) => setCode(value || "")}
@@ -130,6 +161,7 @@ export function Editor({ currentFile, webcontainer }: EditorProps) {
                 formatOnType: true,
                 tabSize: 2,
                 wordWrap: "on",
+                renderValidationDecorations: "off",
               }}
               path={currentFile?.path}
               loading={
@@ -143,7 +175,8 @@ export function Editor({ currentFile, webcontainer }: EditorProps) {
           <div
             style={{
               width: "100%",
-              height: "500px",
+              height: "100%",
+              backgroundColor: "#111111",
               border: "1px solid #ccc",
             }}>
             {url ? (
@@ -154,7 +187,16 @@ export function Editor({ currentFile, webcontainer }: EditorProps) {
                 title="Webcontainer API Content"
               />
             ) : (
-              <p>Loading...</p>
+              <div className="flex justify-center items-center">
+                <div className="text-gray-50 animate-spin p-2">
+                  <Loader2 />
+                </div>
+
+                <p className="text-gray-50 text-3xl">
+                  {outputMessage} if this takes more time please retry with a
+                  new prompt
+                </p>
+              </div>
             )}
           </div>
         )}

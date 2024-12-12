@@ -44,7 +44,7 @@ app.post("/template", async (req: Request, res: Response) => {
   if (response == "node") {
     res.status(200).json({
       prompts: [
-        `# Project Files\n\nThe following is a list of all project files and their complete contents that are currently visible and accessible to you.${BASE_PROMPT_NODE}\n\nHere is a list of files that exist on the file system but are not being shown to you:\n\n  - .gitignore\n  - package-lock.json`,
+        `# use all the stable versions of the dependencies and install all the required dependencies. Project Files\n\nThe following is a list of all project files and their complete contents that are currently visible and accessible to you.${BASE_PROMPT_NODE}\n\nHere is a list of files that exist on the file system but are not being shown to you:\n\n  - .gitignore\n  - package-lock.json`,
       ],
       uiPrompts: BASE_PROMPT_NODE,
     });
@@ -69,12 +69,11 @@ app.post("/chat", async (req: any, res: any) => {
     const result = await model.generateContentStream(prompt);
     for await (const chunk of result.stream) {
       const chunkText = chunk.text();
-      console.log(chunkText, "--------this is the chunk---------");
-      res.write(`${chunkText}`); // Send each chunk to the client
+      console.log(chunkText, "this is the chunk");
+      res.write(chunkText); //Send each chunk to the client
     }
 
-    res.end(); // Signal the end of the stream
-    return res.status(200);
+    return res.end(); // Signal the end of the stream
   } catch (error) {
     res.write(`event: error\ndata: ${JSON.stringify({ error })}\n\n`);
     res.end();
