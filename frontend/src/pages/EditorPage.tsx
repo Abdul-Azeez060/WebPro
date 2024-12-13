@@ -21,6 +21,7 @@ export function EditorPage() {
   async function initWeb() {
     const webcontainerInstance = await WebContainer.boot();
     setwebcontainerinstance(webcontainerInstance);
+    console.log("setted the webcontainer instance");
   }
   useEffect(() => {
     initWeb();
