@@ -1,23 +1,33 @@
 import React, { useState, useCallback, useEffect } from "react";
 import MonacoEditor from "@monaco-editor/react";
-import { FileText, Play } from "lucide-react";
+import { FileText, Loader2, Play } from "lucide-react";
 import { Button } from "./Button";
 import { FileStructure } from "../types/file";
-import axios from "axios";
-import { BACKEND_URL } from "../backend";
-import { useLocation } from "react-router-dom";
+import { WebContainer } from "@webcontainer/api";
+import { downloadProjectAsZip } from "@/utils/getZip";
 
 interface EditorProps {
   currentFile: FileStructure | null;
+  webcontainer: WebContainer;
+  files: FileStructure[];
+  previewLoader: boolean;
+  loading: boolean;
 }
 
-export function Editor({ currentFile }: EditorProps) {
-  const location = useLocation();
-  const { prompt } = location.state || {};
+export function Editor({
+  currentFile,
+  webcontainer,
+  files,
+  previewLoader,
+  loading,
+}: EditorProps) {
   const [view, setView] = useState<"code" | "preview">("code");
-  const [code, setCode] = useState(
+  const [url, setUrl] = useState("");
+  const [outputMessage, setOutputMessage] = useState("");
+  const [code, setCode] = useState<string>(
     currentFile?.content || "// Select a file to edit"
   );
+
   const [isEditorReady, setIsEditorReady] = useState(false);
 
   React.useEffect(() => {
@@ -51,20 +61,32 @@ export function Editor({ currentFile }: EditorProps) {
         return "typescript";
     }
   }, []);
+  const startDevServer = useCallback(async () => {
+    try {
+      setOutputMessage("installing all the dependencies");
+      const installProcess = await webcontainer?.spawn("npm", ["install"]);
+      installProcess.output.pipeTo(
+        new WritableStream({
+          write(data) {
+            console.log(data);
+            setOutputMessage(data);
+          },
+        })
+      );
+      setOutputMessage("Installed all the dependicies");
+      await installProcess.exit;
+      setOutputMessage("running the dev script");
+      await webcontainer.spawn("npm", ["run", "dev"]);
 
-  useEffect(() => {
-    let messages = [];
-    const response = axios
-      .post(`${BACKEND_URL}/template`, {
-        prompt,
-      })
-      .then((res) => (messages = res.data.prompts))
-      .catch((err) => console.log(err));
-
-    axios.post(`${BACKEND_URL}/chat`, {
-      messages: [],
-    });
-  }, []);
+      // Wait for `server-ready` event
+      webcontainer.on("server-ready", (port, url) => {
+        // ...
+        setUrl(url);
+      });
+    } catch (error) {
+      console.log(error, "in starting the webcontainer");
+    }
+  }, [webcontainer]);
 
   return (
     <div className="h-full flex flex-col bg-gray-800/50 backdrop-blur-sm rounded-xl overflow-hidden">
@@ -77,11 +99,41 @@ export function Editor({ currentFile }: EditorProps) {
           Code
         </Button>
         <Button
+          disabled={previewLoader || loading}
           variant={view === "preview" ? "primary" : "secondary"}
-          onClick={() => setView("preview")}
+          onClick={() => {
+            console.log("clicked the preview buttono");
+            startDevServer()
+              .then(() => console.log("server startede successfull"))
+              .catch(() =>
+                console.log("there was an error in starting the server")
+              );
+            console.log("successful set the state to preview");
+            setView("preview");
+          }}
           className="flex items-center gap-2">
-          <Play size={16} />
-          Preview
+          {previewLoader || loading ? (
+            <span className="animate-spin">
+              <Loader2 />
+            </span>
+          ) : (
+            <span>
+              <Play size={16} /> Preview
+            </span>
+          )}
+        </Button>
+        <Button
+          variant="primary"
+          onClick={() => downloadProjectAsZip(files)}
+          disabled={previewLoader || loading}
+          className="flex items-center gap-2">
+          {previewLoader || loading ? (
+            <span className=" animate-spin">
+              <Loader2 />
+            </span>
+          ) : (
+            <span>Download zip</span>
+          )}
         </Button>
       </div>
 
@@ -90,10 +142,7 @@ export function Editor({ currentFile }: EditorProps) {
           <div className="absolute inset-0">
             <MonacoEditor
               height="100%"
-              defaultLanguage="typescript"
-              language={
-                currentFile ? getLanguage(currentFile.path) : "typescript"
-              }
+              language={currentFile ? getLanguage(currentFile.path) : "txt"}
               theme="vs-dark"
               value={code}
               onChange={(value) => setCode(value || "")}
@@ -112,6 +161,7 @@ export function Editor({ currentFile }: EditorProps) {
                 formatOnType: true,
                 tabSize: 2,
                 wordWrap: "on",
+                renderValidationDecorations: "off",
               }}
               path={currentFile?.path}
               loading={
@@ -122,13 +172,32 @@ export function Editor({ currentFile }: EditorProps) {
             />
           </div>
         ) : (
-          <div className="absolute inset-0 bg-white">
-            <iframe
-              title="Preview"
-              srcDoc={code}
-              className="w-full h-full border-0"
-              sandbox="allow-scripts allow-same-origin"
-            />
+          <div
+            style={{
+              width: "100%",
+              height: "100%",
+              backgroundColor: "#111111",
+              border: "1px solid #ccc",
+            }}>
+            {url ? (
+              <iframe
+                src={url}
+                width="100%"
+                height="100%"
+                title="Webcontainer API Content"
+              />
+            ) : (
+              <div className="flex justify-center items-center">
+                <div className="text-gray-50 animate-spin p-2">
+                  <Loader2 />
+                </div>
+
+                <p className="text-gray-50 text-3xl">
+                  {outputMessage} if this takes more time please retry with a
+                  new prompt
+                </p>
+              </div>
+            )}
           </div>
         )}
       </div>

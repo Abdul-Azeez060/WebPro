@@ -1,6 +1,6 @@
 export enum Status {
   pending,
-  success,
+  completed,
   failure,
 }
 
@@ -9,12 +9,15 @@ export enum StepType {
   CreateFolder,
   EditFile,
   DeleteFile,
+  RunScript,
 }
 
 export interface Step {
   id: number;
   description?: string;
-  title: String;
+  code?: string;
+  title: string;
   status: Status;
   stepType: StepType;
+  path?: string;
 }
