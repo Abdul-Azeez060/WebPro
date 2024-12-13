@@ -74,12 +74,12 @@ export function Editor({
         })
       );
       setOutputMessage("Installed all the dependicies");
-      await installProcess.exit;
+      await installProcess?.exit;
       setOutputMessage("running the dev script");
-      await webcontainer.spawn("npm", ["run", "dev"]);
+      await webcontainer?.spawn("npm", ["run", "dev"]);
 
       // Wait for `server-ready` event
-      webcontainer.on("server-ready", (port, url) => {
+      webcontainer?.on("server-ready", (port, url) => {
         // ...
         setUrl(url);
       });
