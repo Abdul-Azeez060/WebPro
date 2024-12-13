@@ -65,7 +65,7 @@ export function Editor({
     try {
       setOutputMessage("installing all the dependencies");
       const installProcess = await webcontainer?.spawn("npm", ["install"]);
-      installProcess.output.pipeTo(
+      installProcess?.output.pipeTo(
         new WritableStream({
           write(data) {
             console.log(data);
